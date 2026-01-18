@@ -1,19 +1,13 @@
 from pathlib import Path
 
-# --------------------------------------------------
-# BASE
-# --------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = "dev-secret-key"
+SECRET_KEY = "dev-secret-key-change-later"
 
 DEBUG = True
 
-ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+ALLOWED_HOSTS = ["*"]
 
-# --------------------------------------------------
-# APPLICATIONS
-# --------------------------------------------------
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -22,18 +16,18 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
 
+    # third-party
     "rest_framework",
     "corsheaders",
 
+    # local apps
     "tasks",
     "dashboards",
     "external_apis",
 ]
 
-# --------------------------------------------------
-# MIDDLEWARE
-# --------------------------------------------------
 MIDDLEWARE = [
+    # CORS must come before CommonMiddleware
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -44,18 +38,11 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
+# Dev-only: allow the frontend dev server to call the API.
 CORS_ALLOW_ALL_ORIGINS = True
 
-# --------------------------------------------------
-# URLS / WSGI
-# --------------------------------------------------
 ROOT_URLCONF = "core.urls"
 
-WSGI_APPLICATION = "core.wsgi.application"
-
-# --------------------------------------------------
-# TEMPLATES
-# --------------------------------------------------
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
@@ -72,9 +59,8 @@ TEMPLATES = [
     },
 ]
 
-# --------------------------------------------------
-# DATABASE (SQLite)
-# --------------------------------------------------
+WSGI_APPLICATION = "core.wsgi.application"
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
@@ -82,44 +68,19 @@ DATABASES = {
     }
 }
 
-# --------------------------------------------------
-# PASSWORDS
-# --------------------------------------------------
-AUTH_PASSWORD_VALIDATORS = [
-    {
-        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
-    },
-]
+AUTH_PASSWORD_VALIDATORS = []
 
-# --------------------------------------------------
-# I18N
-# --------------------------------------------------
 LANGUAGE_CODE = "en-us"
-TIME_ZONE = "UTC"
+TIME_ZONE = "Asia/Kolkata"
 USE_I18N = True
 USE_TZ = True
 
-# --------------------------------------------------
-# STATIC
-# --------------------------------------------------
 STATIC_URL = "static/"
-
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# --------------------------------------------------
-# DRF
-# --------------------------------------------------
-# The frontend does not implement authentication yet. Using AllowAny keeps the
-# API usable during development. When you add auth, switch back to
-# IsAuthenticated and set up proper CORS + CSRF handling.
+# DRF – disable auth for demo
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework.authentication.SessionAuthentication",
-    ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.AllowAny",
-    ],
+    ]
 }
