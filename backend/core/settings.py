@@ -1,12 +1,73 @@
+import os
 from pathlib import Path
+from urllib.parse import unquote, urlparse
+import dj_database_url
+
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = "dev-secret-key-change-later"
+# Load environment variables from backend/.env if present
+load_dotenv(BASE_DIR / ".env")
 
-DEBUG = True
 
-ALLOWED_HOSTS = ["*"]
+def env_bool(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def env_list(name: str, default: list[str] | None = None) -> list[str]:
+    raw = os.getenv(name)
+    if raw is None:
+        return default or []
+    value = raw.strip()
+    if value == "*":
+        return ["*"]
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def database_config_from_url(url: str):
+    parsed = urlparse(url)
+    scheme = (parsed.scheme or "").lower()
+
+    if scheme in {"postgres", "postgresql"}:
+        return {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": unquote((parsed.path or "").lstrip("/")),
+            "USER": unquote(parsed.username or ""),
+            "PASSWORD": unquote(parsed.password or ""),
+            "HOST": parsed.hostname or "",
+            "PORT": str(parsed.port or ""),
+        }
+
+    if scheme in {"sqlite", "sqlite3"}:
+        # sqlite:///relative/path.db  or sqlite:////absolute/path.db
+        raw_path = parsed.path or ""
+        if raw_path in {"", "/"}:
+            db_path = BASE_DIR / "db.sqlite3"
+        else:
+            # Remove leading slash so it works cross-platform with relative paths.
+            candidate = Path(unquote(raw_path.lstrip("/")))
+            db_path = candidate if candidate.is_absolute() else (BASE_DIR / candidate)
+        return {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": db_path,
+        }
+
+    raise ValueError(f"Unsupported DATABASE_URL scheme: {scheme}")
+
+
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-later")
+
+# SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = env_bool("DEBUG", default=True)
+
+# Hosts
+ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1", "0.0.0.0"])
+
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -38,8 +99,12 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-# Dev-only: allow the frontend dev server to call the API.
-CORS_ALLOW_ALL_ORIGINS = True
+# CORS
+# - In DEBUG mode, default to allow-all to keep local dev frictionless.
+# - In production, configure allowed origins explicitly.
+CORS_ALLOW_ALL_ORIGINS = env_bool("CORS_ALLOW_ALL_ORIGINS", default=DEBUG)
+if not CORS_ALLOW_ALL_ORIGINS:
+    CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS", default=[])
 
 ROOT_URLCONF = "core.urls"
 
@@ -61,21 +126,28 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "core.wsgi.application"
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+# Database
+DATABASE_URL = os.getenv("DATABASE_URL")
+if DATABASE_URL:
+    DATABASES = {"default": database_config_from_url(DATABASE_URL)}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
     }
-}
 
 AUTH_PASSWORD_VALIDATORS = []
 
 LANGUAGE_CODE = "en-us"
-TIME_ZONE = "Asia/Kolkata"
+TIME_ZONE = os.getenv("TIME_ZONE", "Asia/Kolkata")
 USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # DRF – disable auth for demo

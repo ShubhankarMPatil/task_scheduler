@@ -10,10 +10,12 @@ def api_index(_request):
             "endpoints": {
                 "tasks": "/api/tasks/",
                 "tasks_populate": "/api/tasks/populate/?date=YYYY-MM-DD",
+                "tasks_stats": "/api/tasks/stats/?date=YYYY-MM-DD (optional)",
+                "tasks_world_time": "/api/tasks/world-time/",
                 "templates": "/api/templates/",
                 "time_entries": "/api/time-entries/?task=<task_id>",
                 "dashboard": "/api/dashboard/?date=YYYY-MM-DD",
-                "world_time": "/api/world-time/",
+                "world_time_legacy": "/api/world-time/",
             },
         }
     )

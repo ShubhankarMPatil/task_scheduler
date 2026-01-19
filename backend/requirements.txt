@@ -5,3 +5,5 @@ python-dotenv
 django-cors-headers
 requests
 gunicorn
+whitenoise
+dj-database-url

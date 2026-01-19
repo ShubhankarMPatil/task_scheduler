@@ -5,10 +5,13 @@ from datetime import date
 from django.db.models import Exists, OuterRef, Subquery, Sum
 from django.db.models.functions import Coalesce
 from django.utils import timezone
+from requests import RequestException
 from rest_framework import mixins, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
+
+from external_apis.world_time import fetch_current_time
 
 from .models import HabitTemplate, Task, TimeEntry
 from .serializers import HabitTemplateSerializer, TaskSerializer, TimeEntrySerializer
@@ -53,6 +56,57 @@ class TaskViewSet(ModelViewSet):
         if user is None:
             return qs.filter(user__isnull=True)
         return qs.filter(user=user)
+
+    @action(detail=False, methods=["get"], url_path="stats")
+    def stats(self, request):
+        """Simple report endpoint used by the frontend chart.
+
+        Returns counts of completed vs pending tasks, optionally scoped to a date.
+        """
+
+        qs = self._scoped_queryset()
+
+        date_param = request.query_params.get("date")
+        selected_date = None
+        if date_param is not None:
+            selected_date = _parse_date_param(date_param)
+            qs = qs.filter(date=selected_date)
+
+        completed = qs.filter(completed=True).count()
+        pending = qs.filter(completed=False).count()
+
+        return Response(
+            {
+                "date": str(selected_date) if selected_date else None,
+                "total": completed + pending,
+                "completed": completed,
+                "pending": pending,
+            }
+        )
+
+    @action(detail=False, methods=["get"], url_path="world-time")
+    def world_time(self, _request):
+        """Proxy World Time API through the backend.
+
+        This endpoint exists to satisfy the assignment requirement:
+        GET /api/tasks/world-time/
+        """
+
+        try:
+            data = fetch_current_time()
+        except RequestException as exc:
+            return Response(
+                {"detail": "Failed to fetch world time.", "error": str(exc)},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        return Response(
+            {
+                "timezone": data.get("timezone"),
+                "datetime": data.get("datetime"),
+                "utc_offset": data.get("utc_offset"),
+            }
+        )
 
     def get_queryset(self):
         qs = self._scoped_queryset()
