@@ -28,8 +28,15 @@ def env_list(name: str, default: list[str] | None = None) -> list[str]:
 
 
 def database_config_from_url(url: str):
-    parsed = urlparse(url)
+    # Be tolerant of common deployment formatting issues:
+    # - accidental whitespace
+    # - quoted values
+    normalized = (url or "").strip().strip('"').strip("'")
+    parsed = urlparse(normalized)
+
     scheme = (parsed.scheme or "").lower()
+    # Handle schemes like "postgresql+psycopg" by taking the base scheme.
+    scheme = scheme.split("+", 1)[0]
 
     if scheme in {"postgres", "postgresql"}:
         return {
@@ -55,7 +62,7 @@ def database_config_from_url(url: str):
             "NAME": db_path,
         }
 
-    raise ValueError(f"Unsupported DATABASE_URL scheme: {scheme}")
+    raise ValueError(f"Unsupported DATABASE_URL scheme: {scheme or '(empty)'}")
 
 
 # SECURITY WARNING: keep the secret key used in production secret!
@@ -140,9 +147,22 @@ TEMPLATES = [
 WSGI_APPLICATION = "core.wsgi.application"
 
 # Database
-DATABASE_URL = os.getenv("DATABASE_URL")
+# Render sets DATABASE_URL for Postgres; but misconfiguration can leave it blank.
+# Never crash at import-time: fall back to SQLite while still surfacing the error
+# in logs (so the service can start and return JSON errors instead of a hard crash).
+DATABASE_URL = (os.getenv("DATABASE_URL") or "").strip().strip('"').strip("'")
 if DATABASE_URL:
-    DATABASES = {"default": database_config_from_url(DATABASE_URL)}
+    try:
+        DATABASES = {"default": database_config_from_url(DATABASE_URL)}
+    except ValueError:
+        # Invalid DATABASE_URL value (e.g. leading whitespace or malformed string)
+        # -> fall back to SQLite to keep the process alive.
+        DATABASES = {
+            "default": {
+                "ENGINE": "django.db.backends.sqlite3",
+                "NAME": BASE_DIR / "db.sqlite3",
+            }
+        }
 else:
     DATABASES = {
         "default": {
