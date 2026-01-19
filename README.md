@@ -34,12 +34,14 @@ python manage.py runserver
 Backend will run at `http://127.0.0.1:8000/`.
 
 ### Backend environment variables
-Set these in `backend/.env`:
+Set these in `backend/.env` (or as Render environment variables):
 - `DEBUG` (True/False)
 - `SECRET_KEY`
 - `ALLOWED_HOSTS` (comma-separated)
-- `DATABASE_URL` (optional; if omitted defaults to SQLite)
-- `CORS_ALLOW_ALL_ORIGINS` and optionally `CORS_ALLOWED_ORIGINS`
+- `DATABASE_URL` (Postgres on Render recommended)
+- `CORS_ALLOW_ALL_ORIGINS` and/or `CORS_ALLOWED_ORIGINS` (comma-separated)
+- `CSRF_TRUSTED_ORIGINS` (comma-separated; typically your Vercel URL)
+- `LOG_LEVEL` (INFO/DEBUG)
 
 ## Frontend setup (Next.js)
 From repo root:
@@ -55,8 +57,10 @@ npm run dev
 Frontend will run at `http://localhost:3000/`.
 
 ### Frontend environment variables
-Set these in `frontend/.env.local`:
-- `NEXT_PUBLIC_API_BASE_URL` (example: `http://127.0.0.1:8000/api`)
+Set these in `frontend/.env.local` locally, and in Vercel project env vars in production:
+- `NEXT_PUBLIC_API_BASE_URL`
+  - local: `http://127.0.0.1:8000/api`
+  - production: `https://<your-render-service>.onrender.com/api`
 
 ## API endpoints (backend)
 - CRUD Tasks: `GET/POST /api/tasks/`, `GET/PATCH/PUT/DELETE /api/tasks/{id}/`
@@ -84,13 +88,31 @@ Set these in `frontend/.env.local`:
 - Backend: `GET /api/tasks/world-time/`
 - UI: World Time panel on `http://localhost:3000/tasks`
 
-## Deployment notes (high level)
-- Set `DEBUG=False` and a strong `SECRET_KEY`.
-- Set `ALLOWED_HOSTS` to your domain(s).
-- Provide `DATABASE_URL` (Postgres recommended in production).
-- For Django static files:
-  - run `python manage.py collectstatic`
-  - serve `backend/staticfiles/` via your web server / platform
-- Run Django with Gunicorn (example):
-  - `gunicorn core.wsgi:application`
-- Frontend can be deployed with Vercel (or run as Node server via `next build` + `next start`).
+## Deployment notes (Render + Vercel)
+### Render (backend)
+Recommended Render settings:
+- Root directory: `backend`
+- Build command:
+  - `pip install -r requirements.txt`
+- Start command (recommended):
+  - `bash render_start.sh`
+  - This runs `migrate`, `collectstatic`, then starts gunicorn.
+
+Minimum required Render env vars:
+- `DEBUG=False`
+- `SECRET_KEY=<strong-random-value>`
+- `DATABASE_URL=<render-postgres-database-url>`
+- `ALLOWED_HOSTS=<your-render-hostname>` (or `*` for demo-only)
+- `CORS_ALLOWED_ORIGINS=https://<your-vercel-app>.vercel.app`
+- `CSRF_TRUSTED_ORIGINS=https://<your-vercel-app>.vercel.app`
+
+If you see a response like `Database is not ready (did you run migrations?)`, it means migrations weren’t applied. Using `render_start.sh` prevents this.
+
+### Vercel (frontend)
+- Add env var:
+  - `NEXT_PUBLIC_API_BASE_URL=https://<your-render-service>.onrender.com/api`
+- Redeploy after setting env vars.
+
+### Notes
+- Backend uses Gunicorn and is compatible with Render.
+- Backend returns JSON error responses even for unexpected failures (no HTML 500 pages).
